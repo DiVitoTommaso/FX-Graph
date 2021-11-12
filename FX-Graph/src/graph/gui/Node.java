@@ -245,4 +245,9 @@ public class Node<T> extends Button {
 			arrow.setEndY(getLayoutY() + getPrefHeight() / 2);
 		}
 	}
+
+	@Override
+	public String toString() {
+		return val.toString();
+	}
 }

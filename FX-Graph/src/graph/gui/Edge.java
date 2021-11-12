@@ -18,6 +18,9 @@ public class Edge<K> extends Group {
 	private final Line line;
 	private final ObjectProperty<K> weight;
 
+	private Node<?> from;
+	private Node<?> to;
+
 	/**
 	 * 
 	 * Hashable object.This object can be used as key in dictionaries, even if value
@@ -32,12 +35,15 @@ public class Edge<K> extends Group {
 	 * @param radius radius offset
 	 */
 
-	public Edge(@NotNull Node<?> from, @NotNull Node<?> to, @NotNull double radius, @Nullable K weight) {
+	public <T> Edge(@NotNull Node<?> from, @NotNull Node<?> to, @NotNull double radius, @Nullable K weight) {
 		this(new Line(), new Line(), new Line(), new Text(), new SimpleObjectProperty<K>(weight), radius);
+		this.from = from;
+		this.to = to;
 		setStartX(from.getLayoutX() + from.getPrefWidth() / 2);
 		setStartY(from.getLayoutY() + from.getPrefHeight() / 2);
 		setEndX(to.getLayoutX() + to.getPrefWidth() / 2);
 		setEndY(to.getLayoutY() + to.getPrefHeight() / 2);
+
 	}
 
 	/**
@@ -50,7 +56,7 @@ public class Edge<K> extends Group {
 	 * @param xe     x end
 	 * @param ye     y end
 	 * @param radius radius offset
-	 * @param weight initial arrow weight
+	 * @param flow initial arrow weight
 	 */
 
 	public Edge(@NotNull Node<?> from, @NotNull Node<?> to, @NotNull double radius) {
@@ -137,6 +143,12 @@ public class Edge<K> extends Group {
 					text.setText(weight.getValue().toString().replace(".0", ""));
 
 				text.toFront();
+				line.toFront();
+				arrow1.toFront();
+				arrow2.toFront();
+
+				from.toFront();
+				to.toFront();
 			}
 		};
 
@@ -222,8 +234,25 @@ public class Edge<K> extends Group {
 		line.setStroke(c);
 	}
 
+	public final Color getStroke() {
+		return (Color) line.getStroke();
+	}
+
 	public final ObjectProperty<Paint> strokeProperty() {
 		return line.strokeProperty();
+	}
+
+	public final Node<?> getNodeFrom() {
+		return from;
+	}
+
+	public final Node<?> getNodeTo() {
+		return to;
+	}
+
+	@Override
+	public String toString() {
+		return "(" + from.toString() + "," + to.toString() + ")" + "=" + weight.get().toString();
 	}
 
 }

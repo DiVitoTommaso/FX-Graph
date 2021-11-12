@@ -1,7 +1,10 @@
 package graph;
 
 import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
 
+import graph.dataclasses.FlowWeight;
 import graph.gui.FXGraph;
 import graph.gui.Node;
 import javafx.application.Application;
@@ -9,6 +12,7 @@ import javafx.application.Platform;
 import javafx.scene.Scene;
 import javafx.stage.Stage;
 import javafx.stage.Window;
+import javafx.util.Pair;
 
 public class Main extends Application {
 
@@ -19,43 +23,31 @@ public class Main extends Application {
 		try {
 			window = primaryStage;
 
-			Node<String>[] nodes = Node.array("INIZIO", "INF", "ELET", "MECC", "CIV", "SPA", "GER", "FR", "NOR", "GB", "FINE");
+			Node<String>[] nodes = Node.array("1", "2", "3", "4", "5");
 			HashMap<String, Node<String>> map = Node.asMap(nodes);
-			
-			FXGraph<String, Integer> fotocopiatrici = new FXGraph<>(true);
-			
+
+			FXGraph<String, FlowWeight> fotocopiatrici = new FXGraph<>(true);
+
 			fotocopiatrici.addNodes(nodes);
-			fotocopiatrici.newEdge(map.get("INIZIO"), map.get("INF"), 20);
-			fotocopiatrici.newEdge(map.get("INIZIO"), map.get("ELET"), 16);
-			fotocopiatrici.newEdge(map.get("INIZIO"), map.get("MECC"), 15);
-			fotocopiatrici.newEdge(map.get("INIZIO"), map.get("CIV"), 20);
-			fotocopiatrici.newEdge(map.get("INF"), map.get("SPA"), 10);
-			fotocopiatrici.newEdge(map.get("INF"), map.get("GER"), 10);
-			fotocopiatrici.newEdge(map.get("INF"), map.get("NOR"), 10);
-			fotocopiatrici.newEdge(map.get("INF"), map.get("GB"), 10);
-			
-			fotocopiatrici.newEdge(map.get("ELET"), map.get("GER"), 10);
-			fotocopiatrici.newEdge(map.get("ELET"), map.get("NOR"), 10);
-			fotocopiatrici.newEdge(map.get("ELET"), map.get("GB"), 10);
-			fotocopiatrici.newEdge(map.get("ELET"), map.get("FR"), 10);
-			
-			fotocopiatrici.newEdge(map.get("MECC"), map.get("GER"), 10);
-			fotocopiatrici.newEdge(map.get("MECC"), map.get("SPA"), 10);
-			fotocopiatrici.newEdge(map.get("MECC"), map.get("GB"), 10);
-			fotocopiatrici.newEdge(map.get("MECC"), map.get("FR"), 10);
-			
-			fotocopiatrici.newEdge(map.get("CIV"), map.get("SPA"), 10);
-			fotocopiatrici.newEdge(map.get("CIV"), map.get("NOR"), 10);
-			fotocopiatrici.newEdge(map.get("CIV"), map.get("GB"), 10);
-			fotocopiatrici.newEdge(map.get("CIV"), map.get("FR"), 10);
-			
-			fotocopiatrici.newEdge(map.get("GER"), map.get("FINE"), 20);
-			fotocopiatrici.newEdge(map.get("SPA"), map.get("FINE"), 20);
-			fotocopiatrici.newEdge(map.get("FR"), map.get("FINE"), 25);
-			fotocopiatrici.newEdge(map.get("NOR"), map.get("FINE"), 5);
-			fotocopiatrici.newEdge(map.get("GB"), map.get("FINE"), 15);
-			
-			
+			fotocopiatrici.newEdge(map.get("3"), map.get("1"), new FlowWeight(0, 4));
+			fotocopiatrici.newEdge(map.get("5"), map.get("1"), new FlowWeight(0, 3));
+			fotocopiatrici.newEdge(map.get("2"), map.get("1"), new FlowWeight(0, 1));
+			fotocopiatrici.newEdge(map.get("3"), map.get("2"), new FlowWeight(0, 1));
+			fotocopiatrici.newEdge(map.get("4"), map.get("3"), new FlowWeight(0, 4));
+			fotocopiatrici.newEdge(map.get("2"), map.get("4"), new FlowWeight(0, 2));
+			fotocopiatrici.newEdge(map.get("5"), map.get("2"), new FlowWeight(0, 2));
+			fotocopiatrici.newEdge(map.get("5"), map.get("4"), new FlowWeight(0, 3));
+
+			Map<Node<String>, Integer> ex = new HashMap<>();
+			Map<Node<String>, Integer> dx = new HashMap<>();
+			ex.put(map.get("3"), 2);
+			ex.put(map.get("5"), 2);
+
+			dx.put(map.get("4"), -1);
+			dx.put(map.get("1"), -3);
+
+			System.out.println("Min cost: " + fotocopiatrici.edmondsKarpLogged(map.get("5"), map.get("1")));
+
 			primaryStage.setScene(new Scene(fotocopiatrici, 1280, 720));
 			primaryStage.show();
 		} catch (Exception e) {
