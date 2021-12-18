@@ -2,22 +2,22 @@ package graph.dataclasses;
 
 public class FlowWeight {
 
-	public int flow;
+	public int value;
 	public int capacity;
 
-	public FlowWeight(int flow, int capacity) {
+	public FlowWeight(int value, int capacity) {
 		super();
-		this.flow = flow;
+		this.value = value;
 		this.capacity = capacity;
 	}
 
 	public int getAvailable() {
-		return capacity - flow;
+		return capacity - value;
 	}
 
 	@Override
 	public String toString() {
-		return "[" + flow + "," + capacity + "]";
+		return "[" + value + "," + capacity + "]";
 	}
 
 }

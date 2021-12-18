@@ -9,10 +9,10 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Function;
 
 import graph.annotations.NotNull;
 import graph.annotations.Nullable;
-import graph.dataclasses.GraphTriple;
 import graph.dataclasses.FlowWeight;
 import graph.dataclasses.GraphLayout;
 import graph.dataclasses.WeightConverter;
@@ -39,7 +39,7 @@ public class FXGraph<T, K> extends Group {
 
 	// cache variables to store node focused and edge focused
 	private final ObjectProperty<Node<T>> nodeFocused = new SimpleObjectProperty<>();
-	private final ObjectProperty<GraphTriple<Node<T>, Edge<K>, Node<T>>> edgeFocused = new SimpleObjectProperty<>();
+	private final ObjectProperty<Edge<K>> edgeFocused = new SimpleObjectProperty<>();
 
 	/**
 	 * Create a new graph.
@@ -126,30 +126,44 @@ public class FXGraph<T, K> extends Group {
 		}
 	}
 
+	/**
+	 * execute kruskal algorithm on undirected graph
+	 * 
+	 * @param conv the converter to convert generic edge weight to double
+	 * @return the cost of the tree found
+	 * @throws IllegalStateException if graph is a digraph
+	 */
+
 	public final double kruskal(@NotNull WeightConverter<K> conv) {
 		checkThread();
 		resetNodes();
 
 		Objects.requireNonNull(conv);
 
-		if (digraph)
+		if (digraph) // check if is undirected graph
 			throw new IllegalStateException("Kruskal algorithm can be applied only to undirected graphs");
 
-		ArrayList<Edge<K>> arr = new ArrayList<>();
+		ArrayList<Edge<K>> arr = new ArrayList<>(); // store all edges is a list
 		for (Map<Node<T>, Edge<K>> m : edges.values())
 			arr.addAll(m.values());
 
+		// sort edges by weight
 		arr.sort((e1, e2) -> (int) (conv.convert(e1.getWeight()) - conv.convert(e2.getWeight())));
 
+		// set time of each node to different values
 		for (int i = 0; i < nodes.size(); i++)
 			nodes.get(i).time = i;
 
+		// create empty list to store taken edges
 		ArrayList<Edge<K>> neww = new ArrayList<>();
 
 		for (Edge<K> e : arr) {
+			// if n-1 edges have been selected stop
 			if (neww.size() == nodes.size() - 1)
 				break;
 
+			// else store the edge if no cycle is created and update group of each node
+			// (time)
 			if (e.getNodeFrom().time != e.getNodeTo().time) {
 				neww.add(e);
 				double max = Math.max(e.getNodeFrom().time, e.getNodeTo().time);
@@ -162,8 +176,10 @@ public class FXGraph<T, K> extends Group {
 
 		}
 
+		// show selected edges
 		neww.forEach(e -> e.setStroke(Color.RED));
 
+		// get the sum of the weights
 		double temp = 0;
 		for (Edge<K> e : neww)
 			temp += conv.convert(e.getWeight());
@@ -171,6 +187,14 @@ public class FXGraph<T, K> extends Group {
 		return temp;
 
 	}
+
+	/**
+	 * apply dijkstra algorithm starting from the given node (WARNING NO CHECK ARE
+	 * DONE FOR NEGATIVE EDGES VALUES)
+	 * 
+	 * @param root the root node
+	 * @param conv the weight converter to convert the generic weight to a number
+	 */
 
 	public final void dijkstra(@NotNull Node<T> root, @NotNull WeightConverter<K> conv) {
 		checkThread();
@@ -180,48 +204,99 @@ public class FXGraph<T, K> extends Group {
 		Objects.requireNonNull(conv);
 
 		root.time = 0;
+		// create priority min queue
 		LinkedList<Node<T>> queue = new LinkedList<>(nodes);
 
+		// while queue is not empty
 		while (!queue.isEmpty()) {
+			// extract min
 			queue.sort((e1, e2) -> (int) (e1.time - e2.time));
 			Node<T> n = queue.pop();
 
+			// relax all outgoing edges
 			for (Node<T> n2 : edges.get(n).keySet())
 				relax(n, n2, edges.get(n).get(n2).getWeight(), conv);
 		}
 
 	}
 
+	/**
+	 * apply fordFulkerson algorithm to graph
+	 * 
+	 * @param root the source node of the flow
+	 * @param end  the destination node of the flow
+	 * @return the max flow
+	 */
+
 	public final int fordFulkerson(@NotNull Node<T> root, @NotNull Node<T> end) {
 		return fordFulkerson(root, end, false);
 	}
 
+	/**
+	 * apply fordFulkerson algorithm to graph printing step by step each iteration
+	 * 
+	 * @param root the source node of the flow
+	 * @param end  the destination node of the flow
+	 * @return the max flow
+	 */
+
 	public final int fordFulkersonLogged(@NotNull Node<T> root, @NotNull Node<T> end) {
 		return fordFulkerson(root, end, true);
 	}
+
+	/**
+	 * apply bfs algorithm to graph
+	 * 
+	 * @param root the root node
+	 */
 
 	public void bfs(@NotNull Node<T> root) {
 		checkThread();
 		resetNodes();
 		Objects.requireNonNull(root);
 
-		LinkedList<Node<T>> stack = new LinkedList<>(Arrays.asList(root));
+		LinkedList<Node<T>> queue = new LinkedList<>(Arrays.asList(root));
 
-		while (!stack.isEmpty()) {
-			Node<T> pop = stack.removeLast();
+		// while queue is not empty
+		while (!queue.isEmpty()) {
+			Node<T> pop = queue.removeFirst();
 			pop.time = 0;
 
+			// visit all edges of each node and add them to queue if not visited
 			for (Node<T> n : edges.get(pop).keySet())
 				if (n.time == Integer.MAX_VALUE) {
+					edges.get(pop).get(n).setStroke(Color.RED);
 					n.parent = pop;
-					stack.addLast(n);
+					queue.add(n);
 				}
 		}
 	}
 
+	/**
+	 * apply the min flow algorithm to a graph
+	 * 
+	 * @param ex the collection of nodes with excess of flow
+	 * @param dx the collection of nodes with defect of flow
+	 * @return the minimun cost needed to send flow on edges to balance the nodes
+	 * @throws IllegalStateException if sum of excess nodes imbalances are not equal
+	 *                               to the sum of defect nodes imbalances
+	 */
+
 	public final int minFlow(@NotNull Map<Node<T>, Integer> ex, @NotNull Map<Node<T>, Integer> dx) {
 		return minFlow(ex, dx, false);
 	}
+
+	/**
+	 * apply the min flow algorithm to a graph printing step by step each iteration
+	 * 
+	 * @param ex the collection of nodes with excess of flow
+	 * @param dx the collection of nodes with defect of flow
+	 * @return the minimun cost needed to send flow on edges to balance the nodes
+	 * @throws IllegalStateException if sum of excess nodes imbalances are not equal
+	 *                               to the sum of defect nodes imbalances or if
+	 *                               edges weights are not instance of FlowWeight or
+	 *                               graph has no ammissible flows
+	 */
 
 	public final int minFlowLogged(@NotNull Map<Node<T>, Integer> ex, @NotNull Map<Node<T>, Integer> dx) {
 		return minFlow(ex, dx, true);
@@ -232,6 +307,7 @@ public class FXGraph<T, K> extends Group {
 		checkThread();
 		resetNodes();
 
+		// check if imbalances are same with opposite sign
 		int sum1 = ex.values().stream().reduce(0, (e1, e2) -> e1 + e2);
 		int sum2 = dx.values().stream().reduce(0, (e1, e2) -> e1 + e2);
 		if (sum1 != -sum2)
@@ -245,6 +321,7 @@ public class FXGraph<T, K> extends Group {
 		for (Map<Node<T>, Edge<K>> m : edges.values())
 			arr.addAll(m.values());
 
+		// check if all edges weights are flow weight
 		arr.forEach(e -> {
 			if (!(e.getWeight() instanceof FlowWeight))
 				throw new IllegalStateException("Graph edge weights are not instance of FlowWeight");
@@ -252,19 +329,22 @@ public class FXGraph<T, K> extends Group {
 
 		ArrayList<Node<T>> exNodes = new ArrayList<>(ex.keySet());
 
+		// create a fake source node to find the shortest path tree for excess nodes
 		Node<T> source = new Node<T>((T) "[SOURCE]");
 
 		addNode(source);
 		for (Node<T> n : ex.keySet())
-			newEdge(source, n, (K) new FlowWeight(0, Integer.MAX_VALUE));
+			addEdge(source, n, (K) new FlowWeight(0, ex.get(n)));
 
 		int minCost = 0;
 		while (!ex.isEmpty()) {
 
-			bellmanFord(source, e -> ((FlowWeight) e).flow);
+			if (!bellmanFord(source, e -> ((FlowWeight) e).value))
+				throw new IllegalStateException("Pseudoflux is not ammissible. Negative cycle found in residual graph");
 
 			Node<T> end = null;
 
+			// take the nearest node in defect
 			for (Node<T> n : dx.keySet())
 				if (end == null)
 					end = n;
@@ -274,17 +354,24 @@ public class FXGraph<T, K> extends Group {
 			if (end.time == Integer.MAX_VALUE)
 				throw new IllegalStateException("Given graph has no eligible flows");
 
+			// get path for the ex -> dx nodes
 			ArrayList<Node<T>> walk = getWalk(end);
+			walk.remove(0);
 
+			// get max sendable flow
 			int flow = getMinMaxFlow(walk);
 
-			flow = Math.min(flow, ex.get(walk.get(1)));
+			// considering the imbalances of nodes
+			flow = Math.min(flow, ex.get(walk.get(0)));
 			flow = Math.min(flow, -dx.get(end));
 
+			// update balances
 			minCost += updateBalances(walk, flow, ex, dx);
 
+			// update capacity of edges used
 			applyMinFlow(walk, flow, doPrint);
 
+			// if excess node is balanced remove it
 			if (!ex.containsKey(walk.get(1)))
 				removeEdge(source, walk.get(1));
 
@@ -298,6 +385,7 @@ public class FXGraph<T, K> extends Group {
 				else
 					v += "0,";
 
+			// print the vector of balances
 			if (doPrint)
 				System.out.println(v.substring(0, v.length() - 1) + "]");
 		}
@@ -305,6 +393,7 @@ public class FXGraph<T, K> extends Group {
 		if (doPrint)
 			System.out.println("END ALGORITHM");
 
+		// remove fake source node and outgoing edges
 		removeNode(source);
 		for (Node<T> n : exNodes)
 			removeEdge(source, n);
@@ -321,6 +410,7 @@ public class FXGraph<T, K> extends Group {
 		if (walk.size() == 1)
 			return min;
 
+		// find max flow sendable on edges
 		for (int i = 0; i < walk.size() - 1; i++) {
 			int available = ((FlowWeight) edges.get(walk.get(i)).get(walk.get(i + 1)).getWeight()).capacity;
 			min = (int) Math.min(min, available);
@@ -336,24 +426,27 @@ public class FXGraph<T, K> extends Group {
 			Node<T> from = walk.get(i);
 			Node<T> to = walk.get(i + 1);
 
+			// update capacity
 			Edge<K> edge = edges.get(from).get(to);
 			((FlowWeight) edge.getWeight()).capacity -= flow;
 
+			// if edge is saturated remove it
 			if (((FlowWeight) edge.getWeight()).capacity == 0) {
 
 				if (doPrint)
-					System.out.print(edges.get(from).get(to) + " => " + flow + " {FULL} => ");
+					System.out.print(edges.get(from).get(to) + " => " + flow + " {FULL} ===> ");
 
 				removeEdge(from, to);
 			} else {
 
 				if (doPrint)
-					System.out.print(edges.get(from).get(to) + " => +" + flow + " => ");
+					System.out.print(edges.get(from).get(to) + " => +" + flow + " ===> ");
 			}
 
+			// update the opposite edge
 			FlowWeight f = (FlowWeight) edge.getWeight();
 			if (edges.get(to).get(from) == null)
-				newEdge(to, from, (K) new FlowWeight(-f.flow, f.flow));
+				addEdge(to, from, (K) new FlowWeight(-f.value, f.value));
 			else
 				((FlowWeight) edges.get(to).get(from).getWeight()).capacity += flow;
 		}
@@ -365,27 +458,48 @@ public class FXGraph<T, K> extends Group {
 
 	private int updateBalances(ArrayList<Node<T>> walk, int flow, Map<Node<T>, Integer> ex, Map<Node<T>, Integer> dx) {
 		int cost = 0;
-		ex.put(walk.get(1), ex.get(walk.get(1)) - flow);
-		if (ex.get(walk.get(1)) == 0) {
-			ex.remove(walk.get(1));
+		// update the balance of the excess node and remove it if balanced
+		ex.put(walk.get(0), ex.get(walk.get(0)) - flow);
+		if (ex.get(walk.get(0)) == 0) {
+			ex.remove(walk.get(0));
 		}
+
+		// update the balance of defect node and remove it if balanced
 
 		dx.put(walk.get(walk.size() - 1), dx.get(walk.get(walk.size() - 1)) + flow);
 		if (dx.get(walk.get(walk.size() - 1)) == 0)
 			dx.remove(walk.get(walk.size() - 1));
 
+		// get the cost needed to send the flow on the found path
 		for (int i = 0; i < walk.size() - 1; i++)
-			cost += ((FlowWeight) edges.get(walk.get(i)).get(walk.get(i + 1)).getWeight()).flow;
+			cost += ((FlowWeight) edges.get(walk.get(i)).get(walk.get(i + 1)).getWeight()).value;
 
 		return cost;
 
 	}
 
-	public int edmondsKarp(@NotNull Node<T> root, @NotNull Node<T> end) {
+	/**
+	 * apply edmonds karp algorithm
+	 * 
+	 * @param root the source node of the flow
+	 * @param end  the destination node of the flow
+	 * @return the ma flow sendable
+	 */
+
+	public final int edmondsKarp(@NotNull Node<T> root, @NotNull Node<T> end) {
 		return edmondsKarp(root, end, false);
 	}
 
-	public int edmondsKarpLogged(@NotNull Node<T> root, @NotNull Node<T> end) {
+	/**
+	 * apply edmonds karp algorithm printing step by step each iteration
+	 * 
+	 * @param root the source node of the flow
+	 * @param end  the destination node of the flow
+	 * @return the max flow sendable
+	 * @throws IllegalStateException if edges weights are not instance of FlowWeight
+	 */
+
+	public final int edmondsKarpLogged(@NotNull Node<T> root, @NotNull Node<T> end) {
 		return edmondsKarp(root, end, true);
 	}
 
@@ -402,6 +516,7 @@ public class FXGraph<T, K> extends Group {
 		for (Map<Node<T>, Edge<K>> m : edges.values())
 			arr.addAll(m.values());
 
+		// check if edges weights are instance of FlowWeight
 		arr.forEach(e -> {
 			if (!(e.getWeight() instanceof FlowWeight))
 				throw new IllegalStateException("Graph edge weights are not instance of FlowWeight");
@@ -410,15 +525,18 @@ public class FXGraph<T, K> extends Group {
 		arr.clear();
 
 		do {
+			// find the shortest path from source to destination using bfs
 			bfs(root);
+			// get path
 			ArrayList<Node<T>> walk = getWalk(end);
 			int min = getMaxFlow(walk);
 
+			// update the flow of edges in the path
 			if (min != Integer.MAX_VALUE) {
 				applyFlow(walk, min, doPrinter);
 				flow += min;
 			}
-		} while (end.time == 0);
+		} while (end.time == 0); // if no path to destination is found => stop
 
 		if (doPrinter)
 			System.out.println("END ALGORITHM");
@@ -426,13 +544,16 @@ public class FXGraph<T, K> extends Group {
 		for (Map<Node<T>, Edge<K>> m : edges.values())
 			arr.addAll(m.values());
 
-		minCut(root);
+		// find the min cut
+		if (doPrinter)
+			minCut(root);
 
+		// set colors
 		arr.forEach(e -> {
 			FlowWeight w = (FlowWeight) e.getWeight();
 			if (w.getAvailable() == 0)
 				e.setStroke(Color.RED);
-			else if (w.flow != 0)
+			else if (w.value != 0)
 				e.setStroke(Color.BLUE);
 			else
 				e.setStroke(Color.BLACK);
@@ -486,7 +607,7 @@ public class FXGraph<T, K> extends Group {
 			FlowWeight w = (FlowWeight) e.getWeight();
 			if (w.getAvailable() == 0)
 				e.setStroke(Color.RED);
-			else if (w.flow != 0)
+			else if (w.value != 0)
 				e.setStroke(Color.BLUE);
 			else
 				e.setStroke(Color.BLACK);
@@ -542,7 +663,7 @@ public class FXGraph<T, K> extends Group {
 			Node<T> to = walk.get(i + 1);
 
 			Edge<K> edge = edges.get(from).get(to);
-			((FlowWeight) edge.getWeight()).flow += min;
+			((FlowWeight) edge.getWeight()).value += min;
 
 			if (((FlowWeight) edge.getWeight()).getAvailable() == 0) {
 				if (doPrint)
@@ -557,9 +678,9 @@ public class FXGraph<T, K> extends Group {
 
 			FlowWeight f = (FlowWeight) edge.getWeight();
 			if (edges.get(to).get(from) == null)
-				newEdge(to, from, (K) new FlowWeight(min, f.capacity));
+				addEdge(to, from, (K) new FlowWeight(f.capacity - min, f.capacity));
 			else
-				((FlowWeight) edges.get(to).get(from).getWeight()).flow += min;
+				((FlowWeight) edges.get(to).get(from).getWeight()).value -= min;
 
 		}
 
@@ -680,7 +801,7 @@ public class FXGraph<T, K> extends Group {
 
 		for (Node<T> n1 : edges.keySet())
 			for (Node<T> n2 : edges.get(n1).keySet())
-				if (n1.time > n2.time + converter.convert(edges.get(n1).get(n2).getWeight()))
+				if (n2.time > n1.time + converter.convert(edges.get(n1).get(n2).getWeight()))
 					return false;
 
 		// fix graphic issues
@@ -695,6 +816,7 @@ public class FXGraph<T, K> extends Group {
 	}
 
 	private void resetNodes() {
+		// reset nodes potential, parents and edges colors
 		for (Node<T> n : nodes) {
 
 			if (edges.get(n) != null)
@@ -759,11 +881,14 @@ public class FXGraph<T, K> extends Group {
 	 */
 
 	@NotNull
-	public final FXGraph<T, K> newEdge(@NotNull Node<T> n1, @NotNull Node<T> n2, @NotNull K w) {
+	public final FXGraph<T, K> addEdge(@NotNull Node<T> n1, @NotNull Node<T> n2, @NotNull K w) {
 		checkThread();
 
 		Objects.requireNonNull(n1);
 		Objects.requireNonNull(n2);
+
+		if (!nodes.containsAll(Arrays.asList(n1, n2)))
+			throw new IllegalArgumentException("Invalid node. Node is not in the graph");
 
 		// create edge n1 -> n2
 		Edge<K> e1 = createEdge(n1, n2, w);
@@ -794,7 +919,7 @@ public class FXGraph<T, K> extends Group {
 
 		arrow.setStrokeWidth(4);
 
-		arrow.setOnMouseClicked(e -> edgeFocused.set(new GraphTriple<>(n1, arrow, n2)));
+		arrow.setOnMouseClicked(e -> edgeFocused.set(arrow));
 
 		edges.get(n1).put(n2, arrow);
 
@@ -882,6 +1007,28 @@ public class FXGraph<T, K> extends Group {
 
 	public void unlock() {
 		lock = false;
+	}
+
+	/**
+	 * add listener for node focus change event
+	 * 
+	 * @param f function callback on focus change
+	 */
+
+	public void setOnNodeFocusChange(@NotNull Function<Node<T>, Void> f) {
+		Objects.requireNonNull(f);
+		nodeFocused.addListener((v, old, neww) -> f.apply(neww));
+	}
+
+	/**
+	 * add listener for edge focus change event
+	 * 
+	 * @param f function callback on focus change
+	 */
+
+	public void setOnEdgeFocusChange(Function<Edge<K>, Void> f) {
+		Objects.requireNonNull(f);
+		edgeFocused.addListener((v, old, neww) -> f.apply(neww));
 	}
 
 	/**

@@ -56,7 +56,7 @@ public class Edge<K> extends Group {
 	 * @param xe     x end
 	 * @param ye     y end
 	 * @param radius radius offset
-	 * @param flow initial arrow weight
+	 * @param flow   initial arrow weight
 	 */
 
 	public Edge(@NotNull Node<?> from, @NotNull Node<?> to, @NotNull double radius) {
